@@ -3,14 +3,22 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 import joblib
 
 
-# Aggregation and computation
+def preprocess_categorical(df):
+    df["target_modules"] = df["target_modules"].apply(eval)
+
+    module_vocab = sorted({m for lst in df["target_modules"] for m in lst})
+    for m in module_vocab:
+        df[f"tm_{m}"] = df["target_modules"].apply(lambda lst: 1 if m in lst else 0)
+    df["layers_tuned"] = df["layers_tuned"].astype("category").cat.codes
+
+    return df, module_vocab
 
 
-def aggregate_dataset(input_csv, output_csv=None, eps=1e-8):
+def aggregate_dataset(input_csv, output_csv=None):
     df = pd.read_csv(input_csv)
     df["seed"] = df["seed"].astype(str)
 
@@ -25,35 +33,34 @@ def aggregate_dataset(input_csv, output_csv=None, eps=1e-8):
         "bert_score", "exact_match", "quality_score", "overfit_flag", "training_efficiency"
     ]
 
-    # Aggregate across seeds
     agg_funcs = {m: ["mean", "std", "min", "max"] for m in metric_cols}
     aggregated = df.groupby(hp_cols).agg(agg_funcs)
     aggregated.columns = [f"{metric}_{stat}" for metric, stat in aggregated.columns]
     aggregated = aggregated.reset_index()
 
-    # Derived metrics
+    aggregated, module_vocab = preprocess_categorical(aggregated)
+
     if output_csv:
         aggregated.to_csv(output_csv, index=False)
         print(f"Aggregated dataset saved to {output_csv}")
 
-    return aggregated, hp_cols
+    return aggregated, hp_cols, module_vocab
 
 
-# Training
-
-
-def train_helper_model(aggregated_df, hp_cols, save_path="peft_helper_model.pkl", scaler_path="peft_scalers.pkl"):
-    """
-    Train a helper model to predict raw numeric metrics only.
-    Derived metrics will be computed later.
-    """
-    X_cols = ["lora_r", "lora_alpha", "lora_dropout", "learning_rate", "batch_size"]
+def train_helper_model(df, hp_cols, module_vocab,
+                       save_path="peft_helper_model.pkl",
+                       scaler_path="peft_scalers.pkl"):
+    X_cols = (
+        ["lora_r", "lora_alpha", "lora_dropout", "learning_rate", "batch_size", "epoch"] +
+        ["layers_tuned"] +
+        [f"tm_{m}" for m in module_vocab]
+    )
 
     exclude_derived = ["loss_stability", "grad_stability", "eval_stability", "robustness_score"]
-    y_cols = [c for c in aggregated_df.columns if c not in hp_cols + exclude_derived and aggregated_df[c].dtype != 'object']
+    y_cols = [c for c in df.columns if c not in hp_cols + exclude_derived and df[c].dtype != "object"]
 
-    X = aggregated_df[X_cols].copy()
-    y = aggregated_df[y_cols].copy()
+    X = df[X_cols].copy()
+    y = df[y_cols].copy()
 
     X_scaler = MinMaxScaler()
     y_scaler = MinMaxScaler()
@@ -61,28 +68,38 @@ def train_helper_model(aggregated_df, hp_cols, save_path="peft_helper_model.pkl"
     X_scaled = X_scaler.fit_transform(X)
     y_scaled = y_scaler.fit_transform(y)
 
-    joblib.dump({"X_scaler": X_scaler, "y_scaler": y_scaler, "y_cols": y_cols}, scaler_path)
-    print(f"Scalers and y_cols saved to {scaler_path}")
+    joblib.dump({
+        "X_scaler": X_scaler,
+        "y_scaler": y_scaler,
+        "y_cols": y_cols,
+        "X_cols": X_cols,
+        "module_vocab": module_vocab
+    }, scaler_path)
 
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_scaled, test_size=0.2, random_state=42)
+    print(f"Scalers saved to {scaler_path}")
 
-    helper_model = MultiOutputRegressor(RandomForestRegressor(n_estimators=200, random_state=42))
-    helper_model.fit(X_train, y_train)
+    X_train, X_test, Y_train, Y_test = train_test_split(X_scaled, y_scaled, test_size=0.2, random_state=42)
 
-    r2 = helper_model.score(X_test, y_test)
-    print(f"Helper model R² score: {r2:.4f}")
+    model = MultiOutputRegressor(RandomForestRegressor(n_estimators=200, random_state=42))
+    model.fit(X_train, Y_train)
 
-    joblib.dump(helper_model, save_path)
-    print(f"Helper model saved to {save_path}")
+    print("Helper Model R²:", model.score(X_test, Y_test))
 
-    return helper_model, X_cols, y_cols
+    joblib.dump(model, save_path)
+    print(f"Model saved to {save_path}")
+
+    return model, X_cols, y_cols
 
 
 if __name__ == "__main__":
     input_csv = "./flan_lora_grid_with_epochs.csv"
     output_csv = "./aggregated_peft_results_exp.csv"
+    aggregated_df, hp_cols, module_vocab = aggregate_dataset(input_csv, output_csv=output_csv)
+    helper_model, X_cols, y_cols = train_helper_model(
+        df=aggregated_df,
+        hp_cols=hp_cols,
+        module_vocab=module_vocab,
+        save_path="peft_helper_model.pkl",
+        scaler_path="peft_scalers.pkl"
+    )
 
-    aggregated_df, hp_cols = aggregate_dataset(input_csv, output_csv=output_csv)
-    helper_model, X_cols, y_cols = train_helper_model(aggregated_df, hp_cols,
-                                                      save_path="peft_helper_model.pkl",
-                                                      scaler_path="peft_scalers.pkl")
