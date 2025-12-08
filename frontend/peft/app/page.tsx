@@ -134,9 +134,6 @@ const handleSubmit = async () => {
                             if (!isValid) errorMessage = "Must be float between 0 and 1";
                             break;
                           case "learning_rate":
-                            isValid = !isNaN(Number(value));
-                            if (!isValid) errorMessage = "Must be a float number";
-                            break;
                         }
                       }
 
