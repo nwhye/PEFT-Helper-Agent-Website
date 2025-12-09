@@ -1,5 +1,6 @@
 import json
 
+
 def generate_full_recommendations(meta, predicted_values, thresholds_path="utils/recommendation_thresholds.json"):
     """
     Generate hyperparameter recommendations based on predicted metrics and dynamic thresholds.
@@ -7,7 +8,7 @@ def generate_full_recommendations(meta, predicted_values, thresholds_path="utils
     predicted_values: tuple(overfit, efficiency, gen_gap)
     thresholds_path: path to the JSON file with precomputed thresholds
     """
-    # Load thresholds
+
     with open(thresholds_path, "r") as f:
         thresholds = json.load(f)
 
@@ -24,13 +25,11 @@ def generate_full_recommendations(meta, predicted_values, thresholds_path="utils
     lora_alpha = meta.get("lora_alpha", 8)
     lora_dropout = meta.get("lora_dropout", 0.05)
 
-    # Helper: fetch threshold safely with fallback
     def get_threshold(key, fallback):
         return thresholds.get(key, fallback)
 
-    # -----------------------------
     # Overfitting / Regularization
-    # -----------------------------
+
     if overfit > get_threshold("high_overfit_q75", 0.1):
         recs.append("Increase lora_dropout or reduce lora_r to reduce overfitting")
 
@@ -46,9 +45,8 @@ def generate_full_recommendations(meta, predicted_values, thresholds_path="utils
     if meta.get("quality_score_gap", 0) > get_threshold("quality_score_gap_q75", 0.015):
         recs.append("Reduce lora_r or adjust target_modules to improve consistency")
 
-    # -----------------------------
     # Training Efficiency
-    # -----------------------------
+
     if efficiency < get_threshold("training_efficiency_mean_q25", 15000):
         recs.append("Increase learning_rate or batch_size to improve training speed")
 
@@ -58,27 +56,23 @@ def generate_full_recommendations(meta, predicted_values, thresholds_path="utils
     if efficiency > get_threshold("training_efficiency_mean_q75", 40000) and eval_loss > get_threshold("eval_loss_mean_q75", 2.7):
         recs.append("Reduce target_modules or lora_alpha for more controlled training")
 
-    # -----------------------------
     # Gradient / Stability
-    # -----------------------------
+
     if grad_ratio > get_threshold("grad_ratio_q75", 1.15):
         recs.append("Reduce lora_r or simplify target_modules to control gradient imbalance")
 
     if grad_norm > get_threshold("gradient_norm_mean_mean_q75", 0.22):
         recs.append("Lower lora_alpha or learning_rate to reduce gradient magnitude")
 
-    # -----------------------------
     # Epoch suggestions
-    # -----------------------------
     if eval_loss > get_threshold("eval_loss_mean_q75", 2.7):
         recs.append("Increase epoch count for better convergence")
 
     if efficiency > get_threshold("training_efficiency_mean_q75", 35000):
         recs.append("Reduce epoch count or increase batch_size to shorten training time")
 
-    # -----------------------------
     # LoRA specific adjustments
-    # -----------------------------
+
     if overfit > get_threshold("high_overfit_q75", 0.15) and lora_r > 8:
         recs.append("Reduce lora_r to prevent overfitting")
 
@@ -88,18 +82,16 @@ def generate_full_recommendations(meta, predicted_values, thresholds_path="utils
     if lora_dropout < 0.05 and overfit > get_threshold("high_overfit_q75", 0.1):
         recs.append("Increase lora_dropout to reduce overfitting")
 
-    # -----------------------------
     # Target Modules
-    # -----------------------------
+
     if quality < get_threshold("quality_score_mean_q25", 0.24):
         recs.append("Adjust target_modules to improve overall output quality")
 
     if gen_gap > get_threshold("loss_best_worst_gap_q75", 0.35):
         recs.append("Use fewer target_modules to reduce generalization gap")
 
-    # -----------------------------
     # Learning rate / batch size
-    # -----------------------------
+
     if loss_stab > get_threshold("loss_stability_q75", 0.08) and gen_gap > get_threshold("loss_best_worst_gap_q75", 0.35):
         recs.append("Reduce learning_rate to prevent unstable training")
 
