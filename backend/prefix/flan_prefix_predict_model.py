@@ -43,19 +43,19 @@ target_cols = ["overfit_mean", "training_efficiency_mean", "loss_diff_train_eval
 input_cols = [c for c in df_derived.select_dtypes(include=[float, int]).columns if c not in target_cols]
 
 
-constant_targets = [c for c in target_cols if df_derived[c].std() == 0]
-target_cols = [c for c in target_cols if c not in constant_targets]
+# constant_targets = [c for c in target_cols if df_derived[c].std() == 0]
+# target_cols = [c for c in target_cols if c not in constant_targets]
 
 
 df_derived = df_derived.dropna(subset=input_cols + target_cols)
 
 scaler_X = StandardScaler()
 df_derived[input_cols] = scaler_X.fit_transform(df_derived[input_cols])
-joblib.dump(scaler_X, "peft_input_scaler.pkl")
+joblib.dump(scaler_X, "prefix_input_scaler.pkl")
 
 scaler_y = StandardScaler()
 df_derived[target_cols] = scaler_y.fit_transform(df_derived[target_cols])
-joblib.dump(scaler_y, "peft_target_scaler.pkl")
+joblib.dump(scaler_y, "prefix_target_scaler.pkl")
 
 dataset = PEFTDataset(df_derived, input_cols, target_cols)
 loader = DataLoader(dataset, batch_size=32, shuffle=True)
@@ -87,5 +87,5 @@ for epoch in range(epochs):
     if (epoch + 1) % 5 == 0:
         print(f"Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.6f}")
 
-torch.save(model.state_dict(), "./peft_recommendation_model.pt")
+torch.save(model.state_dict(), "./prefix_recommendation_model.pt")
 print("Pre-trained model and scalers saved.")

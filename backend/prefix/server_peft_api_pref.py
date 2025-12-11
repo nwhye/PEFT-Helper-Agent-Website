@@ -31,17 +31,27 @@ X_scaler_helper = helper_scalers["X_scaler"]
 y_scaler_helper = helper_scalers["y_scaler"]
 helper_y_cols = helper_scalers["y_cols"]
 helper_X_cols = helper_scalers["X_cols"]
-prefix_vocab = helper_scalers["prefix_vocab"]
 
 
 def preprocess_helper_input(config: Dict):
+    # Convert input to DataFrame
     df = pd.DataFrame([config])
 
-    for key, vocab in prefix_vocab.items():
-        for v in vocab:
-            df[f"{key}_{v}"] = (df[key] == v).astype(int)
+    # Ensure all columns exist
+    for col in helper_X_cols:
+        if col not in df.columns:
+            if col == "layers_tuned":
+                df[col] = 0
+            elif col == "prefix_hidden":
+                df[col] = 64
+            elif col == "prefix_projection":
+                df[col] = 1
+            else:
+                df[col] = 0
 
-    return df[helper_X_cols].copy()
+    # Cast numeric fields to float
+    df = df[helper_X_cols].astype(float)
+    return df
 
 
 app = FastAPI(title="Prefix Tuning Hyperparameter Recommendation API")
