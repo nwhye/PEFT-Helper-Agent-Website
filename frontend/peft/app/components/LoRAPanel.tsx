@@ -33,7 +33,7 @@ export default function LoRAPanel() {
 
   const options: Record<string, string[] | null> = {
     task_type: ["text generation"],
-    dataset: ["tatsu-lab/alpaca "],
+    dataset: ["tatsu-lab/alpaca"],
     lora_r: null,
     lora_alpha: null,
     lora_dropout: null,
@@ -85,7 +85,7 @@ const handleSubmit = async () => {
           <Tabs.Content value="lora" className="flex gap-6">
             {/* Input Panel */}
             <div className="flex-1 bg-gray-900 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-semibold mb-4 text-gray-100">Hyperparameters</h2>
+              <h2 className="text-xl font-semibold mb-4 text-gray-100">LoRA Hyperparameters</h2>
 
               {/* Define free input fields at the top so both map and button can use */}
               {(() => {
