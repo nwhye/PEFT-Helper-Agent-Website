@@ -74,7 +74,7 @@ try:
     bert = evaluate.load("bertscore")
     use_bert = True
 except Exception:
-    print("⚠️ BERTScore not installed. Skipping.")
+    print("BERTScore not installed. Skipping.")
     use_bert = False
 
 # tracking loss + gradients
@@ -265,4 +265,4 @@ for p_len in PREFIX_LENGTHS:
                         print("✓ Row written:", row)
 
 csv_file.close()
-print(f"\n🎯 Finished. CSV saved to: {OUTPUT_FILE}")
+print(f"\nFinished. CSV saved to: {OUTPUT_FILE}")
