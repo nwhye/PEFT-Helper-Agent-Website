@@ -80,14 +80,7 @@ const handleSubmit = async () => {
     <div className="min-h-screen bg-gray-950 flex justify-center items-start p-8">
       <div className="w-full max-w-6xl">
         <Tabs.Root value={selectedTab} onValueChange={setSelectedTab}>
-          <Tabs.List className="flex border-b border-gray-700 mb-6">
-            <Tabs.Trigger
-              value="lora"
-              className="px-6 py-2 rounded-t-lg bg-gray-900 border border-b-0 border-gray-700 mr-2 text-gray-200 hover:bg-gray-800"
-            >
-              LoRA
-            </Tabs.Trigger>
-          </Tabs.List>
+
 
           <Tabs.Content value="lora" className="flex gap-6">
             {/* Input Panel */}

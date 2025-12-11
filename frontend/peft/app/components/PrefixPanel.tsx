@@ -11,6 +11,9 @@ type PrefixFormValues = {
   learning_rate: string;
   batch_size: string;
   epoch: string;
+  layers_tuned: string;
+  prefix_hidden: string;
+  prefix_projection: string;
 };
 
 export default function PrefixPanel() {
@@ -22,9 +25,14 @@ export default function PrefixPanel() {
     learning_rate: "1e-5",
     batch_size: "4",
     epoch: "1",
+    layers_tuned: "0",
+    prefix_hidden: "64",
+    prefix_projection: "True",
   });
 
-  const [results, setResults] = useState(null);
+  const lockedFields = ["prefix_projection", "task_type", "dataset"];
+
+  const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (
@@ -33,14 +41,13 @@ export default function PrefixPanel() {
     setFormValues({ ...formValues, [e.target.name]: e.target.value });
   };
 
-
   const predictPrefix = async () => {
     setLoading(true);
     setResults(null);
 
     try {
       const response = await axios.post(
-        "http://localhost:8001/predict/",  // prefix API
+        "http://localhost:8001/predict/", // prefix API
         formValues
       );
       setResults(response.data);
@@ -58,17 +65,108 @@ export default function PrefixPanel() {
       <div className="flex-1 bg-gray-900 rounded-2xl p-6 shadow-lg">
         <h2 className="text-xl mb-4 text-gray-100">Prefix Hyperparameters</h2>
 
-          {(Object.keys(formValues) as Array<keyof PrefixFormValues>).map((key) => (
-            <div key={key}>
-              <label>{key}</label>
-              <input
-                name={key}
-                value={formValues[key]}
-                onChange={handleChange}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
-            />
-          </div>
-        ))}
+        {/* Prefix Length */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Prefix Length</label>
+          <input
+            type="text"
+            name="prefix_length"
+            value={formValues.prefix_length}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
+          />
+        </div>
+
+        {/* Prefix Dropout */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Prefix Dropout</label>
+          <input
+            type="text"
+            name="prefix_dropout"
+            value={formValues.prefix_dropout}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
+          />
+        </div>
+
+        {/* Learning Rate */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Learning Rate</label>
+          <input
+            type="text"
+            name="learning_rate"
+            value={formValues.learning_rate}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
+          />
+        </div>
+
+        {/* Batch Size */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Batch Size</label>
+          <input
+            type="text"
+            name="batch_size"
+            value={formValues.batch_size}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
+          />
+        </div>
+
+        {/* Epoch */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Epoch</label>
+          <input
+            type="text"
+            name="epoch"
+            value={formValues.epoch}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
+          />
+        </div>
+
+        {/* Layers Tuned */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Layers Tuned</label>
+          <select
+            name="layers_tuned"
+            value={formValues.layers_tuned}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
+          >
+            <option value="0">all</option>
+            <option value="1">last_3</option>
+            <option value="2">first_3</option>
+          </select>
+        </div>
+
+        {/* Prefix Hidden */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Prefix Hidden</label>
+          <select
+            name="prefix_hidden"
+            value={formValues.prefix_hidden}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100"
+          >
+            <option value="64">64</option>
+            <option value="128">128</option>
+            <option value="256">256</option>
+            <option value="0">None</option>
+          </select>
+        </div>
+
+        {/* Prefix Projection */}
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-1">Prefix Projection</label>
+          <input
+            type="text"
+            name="prefix_projection"
+            value="True"
+            disabled
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 cursor-not-allowed"
+          />
+        </div>
 
         <button
           onClick={predictPrefix}
