@@ -28,7 +28,7 @@ export default function PrefixPanel() {
     batch_size: "4",
     epoch: "1",
 
-    layers_tuned: "All", // 0=all,1=last_3,2=first_3
+    layers_tuned: "all",
     prefix_hidden: "64",
     prefix_projection: "True",
   });
@@ -36,9 +36,7 @@ export default function PrefixPanel() {
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // -------------------------------------------
-  // OPTIONS (same structure as LoRA)
-  // -------------------------------------------
+
   const options: Record<string, string[] | null> = {
     task_type: ["text generation"],
     dataset: ["tatsu-lab/alpaca"],
@@ -54,14 +52,8 @@ export default function PrefixPanel() {
     prefix_projection: ["True"],
   };
 
-  // -------------------------------------------
-  // LOCKED fields (same idea as LoRA)
-  // -------------------------------------------
   const lockedFields = ["prefix_projection", "task_type", "dataset"];
 
-  // -------------------------------------------
-  // FREE INPUT fields (validated like in LoRA)
-  // -------------------------------------------
   const freeInputFields = [
     "prefix_length",
     "prefix_dropout",
@@ -70,16 +62,12 @@ export default function PrefixPanel() {
     "epoch",
   ];
 
-  // -------------------------------------------
-  // Handle form change
-  // -------------------------------------------
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormValues((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // -------------------------------------------
-  // Predict
-  // -------------------------------------------
+
   const handleSubmit = async () => {
     try {
       setLoading(true);
@@ -108,16 +96,12 @@ export default function PrefixPanel() {
     }
   };
 
-  // -------------------------------------------
-  // Chart data
-  // -------------------------------------------
+
   const overfitData = results ? [{ name: "Overfit", value: results.predicted_overfit }] : [];
   const efficiencyData = results ? [{ name: "Efficiency", value: results.predicted_efficiency }] : [];
   const genGapData = results ? [{ name: "Gen.Gap", value: results.predicted_generalization_gap }] : [];
 
-  // -------------------------------------------
-  // RENDER
-  // -------------------------------------------
+
   return (
     <div className="min-h-screen bg-gray-950 flex justify-center items-start p-8">
       <div className="w-full max-w-6xl flex gap-6">
@@ -134,7 +118,6 @@ export default function PrefixPanel() {
             let isValid = true;
             let errorMessage = "";
 
-            // Validation (mirroring LoRA)
             if (freeInputFields.includes(key)) {
               switch (key) {
                 case "prefix_length":
@@ -181,7 +164,6 @@ export default function PrefixPanel() {
                     ))}
                   </select>
                 ) : (
-                  // Free input fields
                   <input
                     type="text"
                     name={key}
