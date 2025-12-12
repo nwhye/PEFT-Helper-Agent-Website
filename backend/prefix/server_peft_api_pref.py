@@ -37,7 +37,6 @@ def preprocess_helper_input(config: Dict):
     # Convert input to DataFrame
     df = pd.DataFrame([config])
 
-    # Ensure all columns exist
     for col in helper_X_cols:
         if col not in df.columns:
             if col == "layers_tuned":
@@ -49,7 +48,6 @@ def preprocess_helper_input(config: Dict):
             else:
                 df[col] = 0
 
-    # Cast numeric fields to float
     df = df[helper_X_cols].astype(float)
     return df
 
@@ -67,7 +65,7 @@ app.add_middleware(
 
 @app.post("/predict/")
 def predict_prefix(config: Dict):
-    # Preprocess helper input and scale
+
     helper_input = preprocess_helper_input(config)
     X_scaled_helper = X_scaler_helper.transform(helper_input)
 

@@ -48,7 +48,6 @@ def compute_derived_metrics(predicted_meta: dict) -> dict:
         df["efficiency_stability"]
     )
 
-    # Convert back to dict
     derived_meta = df.to_dict(orient="records")[0]
 
     return derived_meta

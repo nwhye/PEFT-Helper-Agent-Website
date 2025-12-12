@@ -43,10 +43,6 @@ target_cols = ["overfit_mean", "training_efficiency_mean", "loss_diff_train_eval
 input_cols = [c for c in df_derived.select_dtypes(include=[float, int]).columns if c not in target_cols]
 
 
-# constant_targets = [c for c in target_cols if df_derived[c].std() == 0]
-# target_cols = [c for c in target_cols if c not in constant_targets]
-
-
 df_derived = df_derived.dropna(subset=input_cols + target_cols)
 
 scaler_X = StandardScaler()

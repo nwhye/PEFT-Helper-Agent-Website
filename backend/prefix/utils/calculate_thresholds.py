@@ -20,11 +20,9 @@ def compute_derived_for_dataset(input_csv: str, output_csv: str):
 
     derived_df = pd.DataFrame(derived_rows)
 
-    # Remove duplicated columns automatically
     df = df.loc[:, ~df.columns.duplicated()]
     derived_df = derived_df.loc[:, ~derived_df.columns.duplicated()]
 
-    # Avoid double-existing base metadata: only keep true derived metrics
     derived_only = derived_df[
         [c for c in derived_df.columns if c not in df.columns]
     ]
@@ -48,13 +46,10 @@ def calculate_thresholds(
     Supports ANY PEFT method (Prefix, LoRA, Prompt…)
     because it discovers stability/gap columns dynamically.
     """
-
     thresholds = {}
 
-    # Remove duplicates
     df = df.loc[:, ~df.columns.duplicated()]
 
-    # Convert important numeric columns if they exist
     numeric_cols = [
         efficiency_col,
         overfit_col,
@@ -66,7 +61,6 @@ def calculate_thresholds(
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Auto-detect derived metric groups
     if stability_cols is None:
         stability_cols = [c for c in df.columns if c.endswith("_stability")]
 
@@ -75,22 +69,18 @@ def calculate_thresholds(
 
     quantiles = [0.25, 0.5, 0.75, 0.90]
 
-    # Stability metric thresholds
     for col in stability_cols:
         for q in quantiles:
             thresholds[f"{col}_q{int(q * 100)}"] = float(df[col].quantile(q))
 
-    # Gap metric thresholds
     for col in gap_cols:
         for q in quantiles:
             thresholds[f"{col}_q{int(q * 100)}"] = float(df[col].quantile(q))
 
-    # Main global metrics
     for q in quantiles:
         thresholds[f"{efficiency_col}_q{int(q * 100)}"] = float(df[efficiency_col].quantile(q))
         thresholds[f"{overfit_col}_q{int(q * 100)}"] = float(df[overfit_col].quantile(q))
 
-    # Signal-quality thresholds
     if "eval_loss_mean" in df:
         thresholds["eval_loss_mean_q75"] = float(df["eval_loss_mean"].quantile(0.75))
 

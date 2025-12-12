@@ -49,7 +49,6 @@ def aggregate_dataset(input_csv, output_csv=None):
 def train_helper_model(df, hp_cols,
                        save_path="prefix_helper_model.pkl",
                        scaler_path="prefix_scalers.pkl"):
-    # Features (X)
     X_cols = [
         "prefix_length", "prefix_hidden", "prefix_projection",
         "learning_rate", "batch_size", "epoch", "layers_tuned"
@@ -57,18 +56,15 @@ def train_helper_model(df, hp_cols,
     X = df[X_cols].copy()
 
 
-    # Target (Y): all numeric metric columns
     exclude_derived = ["seed", "model_name", "peft"]
     y_cols = [c for c in df.columns if c not in hp_cols + exclude_derived and df[c].dtype != "object"]
     y = df[y_cols].copy()
 
-    # Scale features and targets
     X_scaler = MinMaxScaler()
     y_scaler = MinMaxScaler()
     X_scaled = X_scaler.fit_transform(X)
     y_scaled = y_scaler.fit_transform(y)
 
-    # Save scalers
     joblib.dump({
         "X_scaler": X_scaler,
         "y_scaler": y_scaler,
@@ -77,15 +73,12 @@ def train_helper_model(df, hp_cols,
     }, scaler_path)
     print(f"Scalers saved to {scaler_path}")
 
-    # Train/test split
     X_train, X_test, Y_train, Y_test = train_test_split(X_scaled, y_scaled, test_size=0.2, random_state=42)
 
-    # Train model
     model = MultiOutputRegressor(RandomForestRegressor(n_estimators=200, random_state=42))
     model.fit(X_train, Y_train)
     print("Helper Model R²:", model.score(X_test, Y_test))
 
-    # Save model
     joblib.dump(model, save_path)
     print(f"Model saved to {save_path}")
 
