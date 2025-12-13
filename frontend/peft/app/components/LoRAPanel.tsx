@@ -11,6 +11,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Cell
   /*Legend,*/
 }
 from "recharts";
@@ -18,6 +19,7 @@ from "recharts";
 export default function LoRAPanel() {
   const [selectedTab, setSelectedTab] = useState("lora");
   const [formValues, setFormValues] = useState({
+    model_name: "google/flan-t5-base",
     task_type: "text generation",
     dataset: "tatsu-lab/alpaca ",
     lora_r: "4",
@@ -32,6 +34,7 @@ export default function LoRAPanel() {
   const [results, setResults] = useState<any>(null);
 
   const options: Record<string, string[] | null> = {
+    model_name: ["google/flan-t5-base"],
     task_type: ["text generation"],
     dataset: ["tatsu-lab/alpaca"],
     lora_r: null,
@@ -43,7 +46,7 @@ export default function LoRAPanel() {
     target_modules: ["['q','v']", "['q','v','o']"],
   };
 
-  const lockedFields = ["task_type", "dataset"];
+  const lockedFields = ["model_name", "task_type", "dataset"];
 
 const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
   const { name, value } = e.target;
@@ -70,9 +73,30 @@ const handleSubmit = async () => {
   }
 };
 
-  const overfitData = results ? [{ name: "Overfit", value: results.predicted_overfit }] : [];
-  const efficiencyData = results ? [{ name: "Efficiency", value: results.predicted_efficiency }] : [];
-  const genGapData = results ? [{ name: "Gen.Gap", value: results.predicted_generalization_gap }] : [];
+  function getBarColor(metric: string, value: number): string {
+    switch(metric) {
+      case "Training Speed":
+        if(value > 60000) return "#10B981"; // green
+        if(value > 30000) return "#FACC15"; // yellow
+        return "#EF4444"; // red
+      case "Loss Slope":
+        if(Math.abs(value) < 0.0005) return "#10B981"; // stable
+        if(Math.abs(value) < 0.001) return "#FACC15"; // moderate
+        return "#EF4444"; // unstable
+      case "Gradient Norm":
+        if(value < 0.2) return "#10B981"; // safe
+        if(value < 0.3) return "#FACC15"; // caution
+        return "#EF4444"; // high
+      default:
+        return "#3B82F6";
+    }
+  }
+
+
+  const trainingSpeedData = results ? [{ name: "Training Speed", value: results.training_speed }] : [];
+  const lossSlopeData     = results ? [{ name: "Loss Slope", value: results.loss_slope }] : [];
+  const gradientNormData  = results ? [{ name: "Gradient Norm", value: results.gradient_norm }] : [];
+
 
   const [loading, setLoading] = useState(false);
 
@@ -204,7 +228,7 @@ const handleSubmit = async () => {
             </div>
 
             {/* Results Panel */}
-            <div className="relative flex-1 bg-gray-900 rounded-2xl p-6 shadow-lg overflow-hidden">
+            <div className="relative flex-1 bg-gray-900 rounded-2xl p-6 shadow-lg overflow-visible">
               <h2 className="text-xl font-semibold mb-4 text-gray-100">Results & Chart</h2>
 
               {/* Loading Overlay */}
@@ -226,73 +250,115 @@ const handleSubmit = async () => {
                   </ul>
 
                   {/* Charts */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                    {/* Overfit */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 ">
+                    {/* Training Speed */}
                     <div className="bg-gray-800 rounded-lg p-4">
                       <ResponsiveContainer width="100%" height={150}>
-                        <BarChart data={overfitData}>
+                        <BarChart data={trainingSpeedData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis dataKey="name" stroke="#D1D5DB" />
-                          <YAxis stroke="#D1D5DB" domain={[-1, 1]} />
+                          <YAxis
+                            stroke="#D1D5DB"
+                            domain={[
+                              Math.min(...trainingSpeedData.map(d => d.value), 0),
+                              Math.max(...trainingSpeedData.map(d => d.value), 70000)
+                            ]}
+                          />
                           <Tooltip
                             contentStyle={{
                               backgroundColor: "#1F2937",
                               border: "none",
                               color: "#F3F4F6",
                             }}
+                            itemStyle={{
+                              color: "#F3F4F6",
+                            }}
+                            wrapperStyle={{ zIndex: 10000 }}
                             formatter={(value: number) => value.toFixed(2)}
                           />
-                          <Bar dataKey="value" fill="#EF4444" radius={[6, 6, 0, 0]} />
+                          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                            {trainingSpeedData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={getBarColor("Training Speed", entry.value)} />
+                            ))}
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                       <p className="text-gray-400 mt-5 text-sm">
-                        The goal: Low (closer to 0). Lower values indicate better generalization.
+                        Higher is better. Faster, more efficient training. Excellent {'>'} 60k, Good 30k–60k, Poor {'<'} 30k.
                       </p>
                     </div>
 
-                    {/* Efficiency */}
+                    {/* Loss Slop */}
                     <div className="bg-gray-800 rounded-lg p-4">
                       <ResponsiveContainer width="100%" height={150}>
-                        <BarChart data={efficiencyData}>
+                        <BarChart data={lossSlopeData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis dataKey="name" stroke="#D1D5DB" />
-                          <YAxis stroke="#D1D5DB" domain={[-1, 1]} />
+                          <YAxis
+                            stroke="#D1D5DB"
+                            domain={[
+                              Math.min(...lossSlopeData.map(d => d.value), -0.0025),
+                              Math.max(...lossSlopeData.map(d => d.value), 0.0025)
+                            ]}
+                          />
                           <Tooltip
                             contentStyle={{
                               backgroundColor: "#1F2937",
                               border: "none",
                               color: "#F3F4F6",
                             }}
-                            formatter={(value: number) => value.toFixed(2)}
+                            itemStyle={{
+                              color: "#F3F4F6",
+                            }}
+                            wrapperStyle={{ zIndex: 10000 }}
+                            formatter={(value: number) => value.toFixed(6)}
                           />
-                          <Bar dataKey="value" fill="#10B981" radius={[6, 6, 0, 0]} />
+                          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                            {lossSlopeData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={getBarColor("Loss Slope", entry.value)} />
+                            ))}
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                       <p className="text-gray-400 mt-5 text-sm">
-                        The goal: High (closer to 1). Higher values mean faster, more efficient training.
+                        Closer to 0 is better. Stable convergence. Excellent {'<'} 0.0005, Good 0.0005–0.001, Poor {'>'} 0.001."
                       </p>
                     </div>
 
-                    {/* Generalization Gap */}
+                    {/* Gradient Norm */}
                     <div className="bg-gray-800 rounded-lg p-4">
                       <ResponsiveContainer width="100%" height={150}>
-                        <BarChart data={genGapData}>
+                        <BarChart data={gradientNormData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis dataKey="name" stroke="#D1D5DB" />
-                          <YAxis stroke="#D1D5DB" domain={[-1, 1]} />
+                          <YAxis
+                            stroke="#D1D5DB"
+                            domain={[
+                              Math.min(...gradientNormData.map(d => d.value), -0.35),
+                              Math.max(...gradientNormData.map(d => d.value), 0.35)
+                            ]}
+                          />
                           <Tooltip
                             contentStyle={{
                               backgroundColor: "#1F2937",
                               border: "none",
                               color: "#F3F4F6",
                             }}
-                            formatter={(value: number) => value.toFixed(2)}
+                            itemStyle={{
+                              color: "#F3F4F6",
+                            }}
+                            wrapperStyle={{ zIndex: 10000 }}
+                            formatter={(value: number) => value.toFixed(3)}
                           />
-                          <Bar dataKey="value" fill="#3B82F6" radius={[6, 6, 0, 0]} />
+                          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                            {gradientNormData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={getBarColor("Gradient Norm", entry.value)} />
+                            ))}
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                       <p className="text-gray-400 mt-5 text-sm">
-                        The goal: Low (closer to 0). Smaller gap indicates better generalization to unseen data.
+                        Lower is safer. Avoid gradient explosion. Excellent {'<'} 0.2, Good 0.2–0.3, Poor {'>'} 0.3.
                       </p>
                     </div>
                   </div>
