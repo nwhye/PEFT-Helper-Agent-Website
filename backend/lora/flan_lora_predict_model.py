@@ -39,46 +39,37 @@ class RecommendationModel(nn.Module):
         return self.net(x)
 
 
-# -----------------------------
-# Load dataset and compute derived metrics
-# -----------------------------
 df = pd.read_csv("helper_model/aggregated_peft_results_exp.csv")
 derived_rows = [compute_derived_metrics(row) for _, row in df.iterrows()]
 df_derived = pd.DataFrame(derived_rows)
 
-# -----------------------------
-# Targets
-# -----------------------------
+
 target_cols = ["training_speed", "loss_slope", "gradient_norm"]
 df_derived["training_speed"] = df_derived["training_efficiency_mean"]
 df_derived["loss_slope"] = df_derived["loss_slope_mean"]
 df_derived["gradient_norm"] = df_derived["gradient_norm_mean_mean"]
 
-# -----------------------------
-# Include user hyperparameters
-# -----------------------------
+
 hyperparameter_cols = ["batch_size", "learning_rate", "lora_r", "lora_alpha", "lora_dropout", "layers_tuned"]
 
-# Fill missing hyperparameters if necessary
+
 for col in hyperparameter_cols:
     if col not in df_derived.columns:
         df_derived[col] = 0
 
-# Encode layers_tuned numerically if needed
+
 if df_derived["layers_tuned"].dtype == object:
     layers_map = {cat: idx for idx, cat in enumerate(sorted(df_derived["layers_tuned"].unique()))}
     df_derived["layers_tuned"] = df_derived["layers_tuned"].map(layers_map)
 
-# Encode target_modules as binary features
+
 module_vocab = ["q", "v", "o"]
 if "target_modules" in df_derived.columns:
     df_derived["target_modules"] = df_derived["target_modules"].apply(eval)
     for m in module_vocab:
         df_derived[f"tm_{m}"] = df_derived["target_modules"].apply(lambda lst: 1 if m in lst else 0)
 
-# -----------------------------
-# Prepare input columns
-# -----------------------------
+
 input_cols = [
     c for c in df_derived.select_dtypes(include=[float, int]).columns
     if c not in target_cols
@@ -86,9 +77,7 @@ input_cols = [
 
 df_derived = df_derived.dropna(subset=input_cols + target_cols)
 
-# -----------------------------
-# Scale inputs and targets
-# -----------------------------
+
 scaler_X = StandardScaler()
 df_derived[input_cols] = scaler_X.fit_transform(df_derived[input_cols])
 joblib.dump(scaler_X, "peft_input_scaler.pkl")
@@ -97,15 +86,11 @@ scaler_y = StandardScaler()
 df_derived[target_cols] = scaler_y.fit_transform(df_derived[target_cols])
 joblib.dump(scaler_y, "peft_target_scaler.pkl")
 
-# -----------------------------
-# Dataset and DataLoader
-# -----------------------------
+
 dataset = PEFTDataset(df_derived, input_cols, target_cols)
 loader = DataLoader(dataset, batch_size=32, shuffle=True)
 
-# -----------------------------
-# Model setup
-# -----------------------------
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = RecommendationModel(input_dim=len(input_cols), output_dim=len(target_cols)).to(device)
 
@@ -114,9 +99,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 epochs = 50
 max_grad_norm = 1.0
 
-# -----------------------------
-# Training loop
-# -----------------------------
+
 model.train()
 for epoch in range(epochs):
     total_loss = 0.0
@@ -137,9 +120,7 @@ for epoch in range(epochs):
     if (epoch + 1) % 5 == 0:
         print(f"Epoch {epoch+1}/{epochs} | Loss: {avg_loss:.6f}")
 
-# -----------------------------
-# Save model
-# -----------------------------
+
 torch.save(model.state_dict(), "peft_recommendation_model.pt")
 print("Model trained with new targets: training_speed, loss_slope, gradient_norm")
 print("User hyperparameters now included in input features: batch_size, learning_rate, lora_r, lora_alpha, lora_dropout, layers_tuned, target_modules")
