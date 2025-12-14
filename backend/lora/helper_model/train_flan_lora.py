@@ -16,8 +16,6 @@ from transformers import (
 )
 from peft import get_peft_model, LoraConfig
 
-# CONFIG
-
 MODEL_NAME = "google/flan-t5-base"
 OUTPUT_FILE = "output/flan_lora_grid_with_seed.csv"
 MAX_SAMPLES = 500
@@ -26,7 +24,6 @@ LEARNING_RATES = [1e-6, 3e-6, 1e-5]
 BATCH_SIZES = [4, 8]
 EPOCHS = [1, 3]
 
-# HYPERPARAMETERS
 LORA_R = [4, 8, 16]
 LORA_ALPHA = [8, 16]
 LORA_DROPOUT = [0.05, 0.1]
@@ -50,8 +47,6 @@ if write_header:
     writer.writeheader()
 
 
-# DATASET
-
 dataset = load_dataset("tatsu-lab/alpaca")["train"].shuffle(seed=67).select(range(MAX_SAMPLES))
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 collator = DataCollatorWithPadding(tokenizer=tokenizer)
@@ -71,19 +66,15 @@ tokenized = tokenized.train_test_split(test_size=0.2)
 tokenized.set_format("torch")
 
 
-# METRICS
-
 rouge = evaluate.load("rouge")
 bleu = evaluate.load("bleu")
 try:
     bert = evaluate.load("bertscore")
     use_bert = True
 except Exception:
-    print("⚠️ BERTScore not installed. Skipping.")
+    print("BERTScore not installed. Skipping.")
     use_bert = False
 
-
-# tracking loss + gradients
 
 class LossGradTracker(TrainerCallback):
     def __init__(self):
@@ -110,8 +101,6 @@ def compute_exact_match(preds, refs):
     return sum(1 for p, r in zip(preds, refs) if p.strip() == r.strip()) / len(preds)
 
 
-# Training Loop
-
 for r in LORA_R:
     for alpha in LORA_ALPHA:
         for dropout in LORA_DROPOUT:
@@ -123,14 +112,12 @@ for r in LORA_R:
 
                                 print(f"\n=== LoRA run | r={r}, alpha={alpha}, dropout={dropout}, modules={modules}, layers={layers}, lr={lr}, bs={bs}, epochs={epoch} ===")
 
-                                # Load model
                                 model = AutoModelForSeq2SeqLM.from_pretrained(
                                     MODEL_NAME,
                                     torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float32,
                                 )
                                 model.config.use_cache = False
 
-                                # Apply LoRA
                                 config = LoraConfig(
                                     r=r,
                                     lora_alpha=alpha,
@@ -142,7 +129,6 @@ for r in LORA_R:
                                 model = get_peft_model(model, config)
                                 model.config.use_cache = False
 
-                                # TrainingArguments
                                 args = TrainingArguments(
                                     output_dir="output/tmp",
                                     eval_strategy="steps",
@@ -202,7 +188,6 @@ for r in LORA_R:
                                     labels[labels == -100] = tokenizer.pad_token_id
                                     refs.extend(tokenizer.batch_decode(labels, skip_special_tokens=True))
 
-                                # Metrics
                                 rouge_res = rouge.compute(predictions=preds, references=refs)
                                 bleu_res = bleu.compute(predictions=preds, references=refs)
 
@@ -215,7 +200,6 @@ for r in LORA_R:
                                 else:
                                     bert_score = None
 
-                                # Derived metrics
 
                                 train_loss_first = tracker.train_losses[0] if tracker.train_losses else None
                                 train_loss_last = tracker.train_losses[-1] if tracker.train_losses else None
@@ -251,8 +235,6 @@ for r in LORA_R:
                                     if lr > 0 else None
                                 )
 
-                                # CSV
-
                                 row = {
                                     "model_name": MODEL_NAME,
                                     "peft": "lora",
@@ -287,4 +269,4 @@ for r in LORA_R:
                                 print("✓ Row written:", row)
 
 csv_file.close()
-print(f"\n🎯 Finished. CSV saved to: {OUTPUT_FILE}")
+print(f"\nFinished. CSV saved to: {OUTPUT_FILE}")

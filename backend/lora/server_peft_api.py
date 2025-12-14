@@ -47,7 +47,6 @@ app.add_middleware(
 def preprocess_helper_input(config: Dict):
     df = pd.DataFrame([config])
 
-    # Convert target_modules from string if needed
     if isinstance(df["target_modules"].iloc[0], str):
         df["target_modules"] = df["target_modules"].apply(eval)
 
@@ -84,8 +83,10 @@ def predict_peft(config: Dict):
     preds = y_scaler_main.inverse_transform([preds_scaled])[0]
     training_speed, loss_slope, gradient_norm = preds
 
+    full_meta = {**config, **derived_meta}
+
     recommendations = generate_full_recommendations(
-        derived_meta,
+        full_meta,
         {
             "training_speed": training_speed,
             "loss_slope": loss_slope,
@@ -97,6 +98,6 @@ def predict_peft(config: Dict):
         "training_speed": float(training_speed),
         "loss_slope": float(loss_slope),
         "gradient_norm": float(gradient_norm),
-        "derived_metrics": derived_meta,
+        "derived_metrics": full_meta,
         "final_recommendations": recommendations,
     }

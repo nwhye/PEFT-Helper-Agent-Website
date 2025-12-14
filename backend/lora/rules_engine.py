@@ -1,107 +1,165 @@
 import json
+import math
 
 
-def generate_full_recommendations(meta, predicted_values, thresholds_path="utils/recommendation_thresholds.json"):
+def training_speed_state(v):
+    if v > 60000:
+        return "green"
+    if v > 30000:
+        return "yellow"
+    return "red"
+
+
+def loss_slope_state(v):
+    v = abs(v)
+    if v < 0.0005:
+        return "green"
+    if v < 0.001:
+        return "yellow"
+    return "red"
+
+
+def gradient_norm_state(v):
+    if v < 0.2:
+        return "green"
+    if v < 0.3:
+        return "yellow"
+    return "red"
+
+
+def generate_full_recommendations(
+    meta,
+    predicted_values,
+    thresholds_path="utils/recommendation_thresholds.json"
+):
     """
-    Generate hyperparameter recommendations based on predicted metrics and dynamic thresholds.
-    meta: dict of model metrics
-    predicted_values: tuple(overfit, efficiency, gen_gap)
-    thresholds_path: path to the JSON file with precomputed thresholds
+    Generate hyperparameter suggestions based on predicted metrics:
+    - training_speed
+    - loss_slope
+    - gradient_norm
+
+    Fully aligned with frontend GREEN / YELLOW / RED logic.
     """
 
     with open(thresholds_path, "r") as f:
         thresholds = json.load(f)
 
-    overfit, efficiency, gen_gap = predicted_values
+    training_speed = predicted_values.get("training_speed", 0.0)
+    loss_slope = predicted_values.get("loss_slope", 0.0)
+    gradient_norm = predicted_values.get("gradient_norm", 0.0)
+
+    batch_size = int(meta.get("batch_size", 4))
+    epoch = int(meta.get("epoch", 1))
+    lora_r = int(meta.get("lora_r", 4))
+    lora_alpha = float(meta.get("lora_alpha", 8))
+    lora_dropout = float(meta.get("lora_dropout", 0.05))
+    learning_rate = float(meta.get("learning_rate", 1e-6))
+    target_modules = meta.get("target_modules", ["q", "v"])
+
+    print(batch_size, epoch, lora_r, lora_alpha, lora_dropout, learning_rate, target_modules)
+
+    num_modules = len(target_modules)
+
     recs = []
+    ##suggested_params = set()
 
-    loss_stab = meta.get("loss_stability", 0)
-    grad_norm = meta.get("gradient_norm_mean_mean", 0)
-    grad_ratio = meta.get("grad_ratio", 1)
-    eval_loss = meta.get("eval_loss_mean", 0)
-    quality = meta.get("quality_score_mean", 0)
-    batch_size = meta.get("batch_size", 4)
-    lora_r = meta.get("lora_r", 4)
-    lora_alpha = meta.get("lora_alpha", 8)
-    lora_dropout = meta.get("lora_dropout", 0.05)
+    speed_state = training_speed_state(training_speed)
+    slope_state = loss_slope_state(loss_slope)
+    grad_state = gradient_norm_state(gradient_norm)
 
-    def get_threshold(key, fallback):
-        return thresholds.get(key, fallback)
+    is_training_healthy = (
+        speed_state == "green"
+        and slope_state == "green"
+        and grad_state == "green"
+    )
 
-    # Overfitting / Regularization
+    if speed_state == "red":
+        if batch_size >= 15:
+            recs.append(f"Consider decreasing batch size to improve training speed..")
+        elif batch_size < 15 or learning_rate < 1e-6:
+            recs.append("Increase batch size or slightly increase learning rate to improve training speed.")
 
-    if overfit > get_threshold("high_overfit_q75", 0.1):
-        recs.append("Increase lora_dropout or reduce lora_r to reduce overfitting")
+    if slope_state == "red":
+        if batch_size >= 7:
+            recs.append(f"Consider decreasing batch size to improve stability.")
+        elif lora_dropout < 0.1 or epoch < 3:
+            recs.append("Increase LoRA dropout, epochs, or reduce learning rate for more stable training.")
 
-    if gen_gap > get_threshold("loss_best_worst_gap_q75", 0.35):
-        recs.append("Reduce learning_rate or simplify target_modules to improve generalization")
+    if grad_state == "red":
+        if batch_size >= 7 or epoch > 64:
+            recs.append(f"Consider decreasing batch size or epoch count to improve gradient spikes.")
+        elif lora_r > 1 or lora_alpha > 8:
+            recs.append("Reduce LoRA rank or LoRA alpha to reduce gradient spikes.")
 
-    if loss_stab > get_threshold("loss_stability_q75", 0.08):
-        recs.append("Reduce learning_rate or increase lora_dropout for more stable training")
+    if speed_state == "yellow":
+        if batch_size >= 7:
+            recs.append(f"Consider decreasing batch size to improve training speed..")
+        elif batch_size < 7:
+            recs.append("Consider very slightly increasing batch size to improve training speed.")
 
-    if meta.get("loss_slope_stability", 0) > get_threshold("loss_slope_stability_q75", 3):
-        recs.append("Increase batch_size or decrease learning_rate to stabilize gradients")
+    if slope_state == "yellow":
+        if batch_size >= 16:
+            recs.append(f"Consider decreasing batch size to improve stability.")
+        elif epoch < 12:
+            recs.append("Slightly increase epochs to improve training stability.")
 
-    if meta.get("quality_score_gap", 0) > get_threshold("quality_score_gap_q75", 0.015):
-        recs.append("Reduce lora_r or adjust target_modules to improve consistency")
+    if grad_state == "yellow":
+        if batch_size >= 16 or epoch > 32:
+            recs.append(f"Consider slightly decreasing batch size or epoch count to improve gradients.")
+        elif lora_alpha > 12:
+            recs.append("Consider lowering LoRA alpha for extra gradient stability.")
 
-    # Training Efficiency
+    if speed_state == "green":
+        if epoch > 1:
+            recs.append("(Optional) Reduce epochs if you want to improve training speed even further.")
 
-    if efficiency < get_threshold("training_efficiency_mean_q25", 15000):
-        recs.append("Increase learning_rate or batch_size to improve training speed")
+    quality_gap = meta.get("quality_score_gap", 0.0)
 
-    if efficiency < get_threshold("training_efficiency_mean_q50", 25000) and loss_stab > get_threshold("loss_stability_q75", 0.08):
-        recs.append("Reduce lora_r or lora_alpha to improve efficiency")
+    if (
+        not is_training_healthy
+        and quality_gap > thresholds.get("quality_score_gap_q75", 0.02)
+        and num_modules > 2
+    ):
+        recs.append("Reduce target modules to improve training stability.")
 
-    if efficiency > get_threshold("training_efficiency_mean_q75", 40000) and eval_loss > get_threshold("eval_loss_mean_q75", 2.7):
-        recs.append("Reduce target_modules or lora_alpha for more controlled training")
+    if (
+        is_training_healthy
+        and quality_gap < thresholds.get("quality_score_gap_q25", 0.011)
+        and num_modules < 2
+    ):
+        recs.append("Consider expanding target modules to improve model capacity.")
 
-    # Gradient / Stability
+    if grad_state == "red" or slope_state == "red":
+        if lora_r > 1:
+            recs.append("Reduce LoRA rank to stabilize training gradients or loss.")
 
-    if grad_ratio > get_threshold("grad_ratio_q75", 1.15):
-        recs.append("Reduce lora_r or simplify target_modules to control gradient imbalance")
+    if is_training_healthy and quality_gap < thresholds.get("quality_score_gap_q25", 0.011):
+        if lora_r < 16:  # upper limit example
+            recs.append("(Optional) Consider increasing LoRA rank to improve model capacity.")
 
-    if grad_norm > get_threshold("gradient_norm_mean_mean_q75", 0.22):
-        recs.append("Lower lora_alpha or learning_rate to reduce gradient magnitude")
+    if grad_state == "red" or slope_state == "red":
+        if lora_alpha > 8:
+            recs.append("Reduce LoRA alpha to prevent gradient spikes or unstable loss.")
 
-    # Epoch suggestions
-    if eval_loss > get_threshold("eval_loss_mean_q75", 2.7):
-        recs.append("Increase epoch count for better convergence")
+    if is_training_healthy and slope_state != "red" and quality_gap < thresholds.get("quality_score_gap_q25", 0.011):
+        if lora_alpha < 12:
+            recs.append("(Optional) Consider increasing LoRA alpha to improve model learning capacity.")
 
-    if efficiency > get_threshold("training_efficiency_mean_q75", 35000):
-        recs.append("Reduce epoch count or increase batch_size to shorten training time")
+    if slope_state == "red" or slope_state == "yellow":
+        if lora_dropout < 0.1:
+            recs.append("Increase LoRA dropout to stabilize training.")
 
-    # LoRA specific adjustments
+    if is_training_healthy and slope_state == "green":
+        if lora_dropout > 0.05:
+            recs.append("(Optional) Consider slightly reducing LoRA dropout for faster convergence.")
 
-    if overfit > get_threshold("high_overfit_q75", 0.15) and lora_r > 8:
-        recs.append("Reduce lora_r to prevent overfitting")
-
-    if lora_alpha > 12 and grad_norm > get_threshold("gradient_norm_mean_mean_q75", 0.22):
-        recs.append("Reduce lora_alpha to improve stability")
-
-    if lora_dropout < 0.05 and overfit > get_threshold("high_overfit_q75", 0.1):
-        recs.append("Increase lora_dropout to reduce overfitting")
-
-    # Target Modules
-
-    if quality < get_threshold("quality_score_mean_q25", 0.24):
-        recs.append("Adjust target_modules to improve overall output quality")
-
-    if gen_gap > get_threshold("loss_best_worst_gap_q75", 0.35):
-        recs.append("Use fewer target_modules to reduce generalization gap")
-
-    # Learning rate / batch size
-
-    if loss_stab > get_threshold("loss_stability_q75", 0.08) and gen_gap > get_threshold("loss_best_worst_gap_q75", 0.35):
-        recs.append("Reduce learning_rate to prevent unstable training")
-
-    if efficiency < get_threshold("training_efficiency_mean_q25", 20000) and grad_norm < get_threshold("gradient_norm_mean_mean_q25", 0.15):
-        recs.append("Increase learning_rate for better convergence speed")
-
-    if batch_size < 4 and efficiency < get_threshold("training_efficiency_mean_q50", 30000):
-        recs.append("Increase batch_size to improve stability")
+    if grad_state == "red" and slope_state == "red":
+        recs.append(
+            "Both gradient spikes and unstable loss detected; consider reducing LoRA rank and alpha, and increasing dropout.")
 
     if not recs:
-        recs.append("Configuration appears stable and efficient; no immediate changes needed")
+        recs.append(
+            "Configuration appears stable and efficient; no immediate changes needed."
+        )
 
     return recs

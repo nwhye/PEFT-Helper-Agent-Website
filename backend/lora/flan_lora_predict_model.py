@@ -122,5 +122,5 @@ for epoch in range(epochs):
 
 
 torch.save(model.state_dict(), "peft_recommendation_model.pt")
-print("Model trained with new targets: training_speed, loss_slope, gradient_norm")
-print("User hyperparameters now included in input features: batch_size, learning_rate, lora_r, lora_alpha, lora_dropout, layers_tuned, target_modules")
+print("Model trained with targets: training_speed, loss_slope, gradient_norm")
+print("User hyperparameters included in input features: batch_size, learning_rate, lora_r, lora_alpha, lora_dropout, layers_tuned, target_modules")
