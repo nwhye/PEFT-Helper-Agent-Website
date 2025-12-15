@@ -88,16 +88,16 @@ export default function PrefixPanel() {
   function getBarColor(metric: string, value: number): string {
     switch (metric) {
       case "Training Speed":
-        if (value > 60000) return "#10B981";
-        if (value > 30000) return "#FACC15";
+        if (value > 25000) return "#10B981";
+        if (value > 8000) return "#FACC15";
         return "#EF4444";
       case "Loss Slope":
-        if (Math.abs(value) < 0.0005) return "#10B981";
-        if (Math.abs(value) < 0.001) return "#FACC15";
+        if (value < 0.0005) return "#10B981";
+        if (value < 0.0015) return "#FACC15";
         return "#EF4444";
       case "Gradient Norm":
-        if (value < 0.2) return "#10B981";
-        if (value < 0.3) return "#FACC15";
+        if (value < 0.35) return "#10B981";
+        if (value < 0.43) return "#FACC15";
         return "#EF4444";
       default:
         return "#3B82F6";
@@ -241,7 +241,7 @@ export default function PrefixPanel() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <p className="text-gray-400 mt-2 text-sm">Higher is better. Excellent &gt;60k, Good 30k–60k, Poor &lt;30k.</p>
+                  <p className="text-gray-400 mt-2 text-sm">Higher is better. Excellent &gt;25k, Good 8k–25k, Poor &lt;8k.</p>
                 </div>
 
                 {/* Loss Slope */}
@@ -259,7 +259,7 @@ export default function PrefixPanel() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <p className="text-gray-400 mt-2 text-sm">Closer to 0 is better. Excellent &lt;0.0005, Good 0.0005–0.001, Poor &gt;0.001.</p>
+                  <p className="text-gray-400 mt-2 text-sm">Closer to 0 is better. Excellent &lt;0.0005, Good 0.0005–0.0015, Poor &gt;0.001.</p>
                 </div>
 
                 {/* Gradient Norm */}
@@ -277,7 +277,7 @@ export default function PrefixPanel() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <p className="text-gray-400 mt-2 text-sm">Lower is safer. Excellent &lt;0.2, Good 0.2–0.3, Poor &gt;0.3.</p>
+                  <p className="text-gray-400 mt-2 text-sm">Lower is safer. Excellent &lt;0.35, Good 0.35–0.43, Poor &gt;0.43.</p>
                 </div>
               </div>
             </div>
