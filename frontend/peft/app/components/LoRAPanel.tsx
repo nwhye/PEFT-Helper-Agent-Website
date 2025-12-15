@@ -111,7 +111,7 @@ const handleSubmit = async () => {
             <div className="flex-1 bg-gray-900 rounded-2xl p-6 shadow-lg">
               <h2 className="text-xl font-semibold mb-4 text-gray-100">LoRA Hyperparameters</h2>
 
-              {/* Define free input fields at the top so both map and button can use */}
+              {}
               {(() => {
                 const freeInputFields = [
                   "lora_r",
@@ -129,7 +129,7 @@ const handleSubmit = async () => {
                       const isFreeInput = freeInputFields.includes(key);
                       /*const hasOptions = options[key] && Array.isArray(options[key]) && options[key].length > 0;*/
 
-                      // Validation logic
+
                       const value = (formValues as any)[key];
                       let isValid = true;
                       let errorMessage = "";

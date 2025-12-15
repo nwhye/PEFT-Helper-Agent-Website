@@ -233,7 +233,17 @@ export default function PrefixPanel() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="name" stroke="#D1D5DB" />
                       <YAxis stroke="#D1D5DB" domain={[Math.min(...trainingSpeedData.map(d => d.value), 0), Math.max(...trainingSpeedData.map(d => d.value), 70000)]} />
-                      <Tooltip formatter={(value: number) => value.toFixed(2)} />
+                      <Tooltip
+                          contentStyle={{
+                              backgroundColor: "#1F2937",
+                              border: "none",
+                              color: "#F3F4F6",
+                            }}
+                            itemStyle={{
+                              color: "#F3F4F6",
+                            }}
+                          wrapperStyle={{ zIndex: 10000 }}
+                          formatter={(value: number) => value.toFixed(2)} />
                       <Bar dataKey="value" radius={[6,6,0,0]}>
                         {trainingSpeedData.map((entry, index) => (
                           <Cell key={index} fill={getBarColor("Training Speed", entry.value)} />
@@ -251,7 +261,17 @@ export default function PrefixPanel() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="name" stroke="#D1D5DB" />
                       <YAxis stroke="#D1D5DB" domain={[Math.min(...lossSlopeData.map(d => d.value), -0.0025), Math.max(...lossSlopeData.map(d => d.value), 0.0025)]} />
-                      <Tooltip formatter={(value: number) => value.toFixed(6)} />
+                      <Tooltip
+                          contentStyle={{
+                              backgroundColor: "#1F2937",
+                              border: "none",
+                              color: "#F3F4F6",
+                            }}
+                            itemStyle={{
+                              color: "#F3F4F6",
+                            }}
+                          wrapperStyle={{ zIndex: 10000 }}
+                          formatter={(value: number) => value.toFixed(6)} />
                       <Bar dataKey="value" radius={[6,6,0,0]}>
                         {lossSlopeData.map((entry, index) => (
                           <Cell key={index} fill={getBarColor("Loss Slope", entry.value)} />
@@ -269,7 +289,17 @@ export default function PrefixPanel() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="name" stroke="#D1D5DB" />
                       <YAxis stroke="#D1D5DB" domain={[Math.min(...gradientNormData.map(d => d.value), 0), Math.max(...gradientNormData.map(d => d.value), 0.35)]} />
-                      <Tooltip formatter={(value: number) => value.toFixed(3)} />
+                      <Tooltip
+                          contentStyle={{
+                              backgroundColor: "#1F2937",
+                              border: "none",
+                              color: "#F3F4F6",
+                            }}
+                            itemStyle={{
+                              color: "#F3F4F6",
+                            }}
+                          wrapperStyle={{ zIndex: 10000 }}
+                          formatter={(value: number) => value.toFixed(3)} />
                       <Bar dataKey="value" radius={[6,6,0,0]}>
                         {gradientNormData.map((entry, index) => (
                           <Cell key={index} fill={getBarColor("Gradient Norm", entry.value)} />
