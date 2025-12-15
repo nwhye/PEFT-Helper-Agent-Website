@@ -1,95 +1,110 @@
 import json
 
 
+def training_speed_state(v):
+    if v > 60000:
+        return "green"
+    if v > 30000:
+        return "yellow"
+    return "red"
+
+
+def loss_slope_state(v):
+    v = abs(v)
+    if v < 0.0005:
+        return "green"
+    if v < 0.001:
+        return "yellow"
+    return "red"
+
+
+def gradient_norm_state(v):
+    if v < 0.2:
+        return "green"
+    if v < 0.3:
+        return "yellow"
+    return "red"
+
+
 def generate_prefix_recommendations(meta, predicted_values, thresholds_path="utils/recommendation_thresholds.json"):
     """
-    Generate hyperparameter recommendations for prefix-tuning based on predicted metrics and dynamic thresholds.
+    Generate hyperparameter recommendations for Prefix-tuning based on predicted metrics:
+    - training_speed
+    - loss_slope
+    - gradient_norm
 
-    meta: dict of model metrics
-    predicted_values: tuple(overfit_mean, training_efficiency_mean, loss_diff_train_eval)
-    thresholds_path: path to JSON file with precomputed thresholds
+    meta: dict of user-provided config and metrics
+    predicted_values: dict containing {"training_speed", "loss_slope", "gradient_norm"}
+    thresholds_path: JSON file with thresholds for dynamic rules
     """
 
     with open(thresholds_path, "r") as f:
         thresholds = json.load(f)
 
-    overfit, efficiency, gen_gap = predicted_values
+    training_speed = predicted_values.get("training_speed", 0.0)
+    loss_slope = predicted_values.get("loss_slope", 0.0)
+    gradient_norm = predicted_values.get("gradient_norm", 0.0)
+
+    batch_size = int(meta.get("batch_size", 4))
+    epoch = int(meta.get("epoch", 1))
+    prefix_length = meta.get("prefix_length", "all")
+    prefix_hidden = int(meta.get("prefix_hidden", 128))
+    prefix_dropout = float(meta.get("prefix_dropout", 0.05))
+    learning_rate = float(meta.get("learning_rate", 1e-6))
+    layers_tuned = meta.get("layers_tuned", 1)
+    target_modules = meta.get("target_modules", ["q", "v"])
+
+    num_modules = len(target_modules)
     recs = []
 
-    loss_stab = meta.get("loss_stability", 0)
-    loss_slope_stab = meta.get("loss_slope_stability", 0)
-    quality_gap = meta.get("quality_score_gap", 0)
-    grad_norm = meta.get("gradient_norm_mean_mean", 0)
-    grad_ratio = meta.get("grad_ratio", 1)
-    eval_loss = meta.get("eval_loss_mean", 0)
-    quality = meta.get("quality_score_mean", 0)
-    batch_size = meta.get("batch_size", 4)
-    prefix_len = meta.get("prefix_length", "all")
-    layer_scope = meta.get("layer_scope", None)
-    prefix_hidden = meta.get("prefix_hidden", 128)
+    speed_state = training_speed_state(training_speed)
+    slope_state = loss_slope_state(loss_slope)
+    grad_state = gradient_norm_state(gradient_norm)
+    is_training_healthy = speed_state == "green" and slope_state == "green" and grad_state == "green"
 
-    def get_threshold(key, fallback):
-        return thresholds.get(key, fallback)
+    if speed_state == "red":
+        if batch_size >= 15:
+            recs.append("Consider decreasing batch size to improve training speed.")
+        else:
+            recs.append("Increase batch size or slightly increase learning rate to improve training speed.")
+    elif speed_state == "yellow":
+        if batch_size < 7:
+            recs.append("Consider slightly increasing batch size to improve training speed.")
+        else:
+            recs.append("Consider slightly decreasing batch size to improve training speed.")
 
-    # Overfitting / Stability Rules
-    if overfit > get_threshold("overfit_flag_mean_q75", 0.1):
-        recs.append("Reduce prefix_length or layer_tuned (scope) to reduce overfitting")
-    if gen_gap > get_threshold("loss_best_worst_gap_q75", 0.35):
-        recs.append("Reduce learning_rate or simplify prefix design (Prefix length, Layers tuned,Prefix Hidden) to improve generalization")
-    if loss_stab > get_threshold("loss_stability_q75", 0.1):
-        recs.append("Reduce learning_rate or increase prefix_hidden for more stable training")
-    if loss_slope_stab > get_threshold("loss_slope_stability_q75", 4.0):
-        recs.append("Increase batch_size or decrease learning_rate to stabilize gradients")
-    if quality_gap > get_threshold("quality_score_gap_q75", 0.025):
-        recs.append("Adjust prefix_length or layer_tuned (scope) to improve output consistency")
+    if slope_state == "red":
+        if batch_size >= 7:
+            recs.append("Consider decreasing batch size to improve stability.")
+        else:
+            recs.append("Increase prefix_dropout, epochs, or reduce learning rate for more stable training.")
+    elif slope_state == "yellow":
+        if epoch < 12:
+            recs.append("Slightly increase epochs to improve training stability.")
 
-    # Training Efficiency Rules
-    if efficiency < get_threshold("training_efficiency_mean_q25", 5000):
-        recs.append("Increase learning_rate or batch_size to improve training speed")
-    if efficiency < get_threshold("training_efficiency_mean_q50", 10000) and loss_stab > get_threshold(
-            "loss_stability_q75", 0.1):
-        recs.append("Reduce prefix_hidden or layer_tuned (scope) to improve efficiency")
-    if efficiency > get_threshold("training_efficiency_mean_q75", 30000) and eval_loss > get_threshold(
-            "eval_loss_mean_q75", 2.5):
-        recs.append("Reduce prefix_length or layer_tuned (scope) for more controlled training")
+    if grad_state == "red":
+        if batch_size >= 7 or epoch > 64:
+            recs.append("Consider decreasing batch size or epoch count to reduce gradient spikes.")
+        elif prefix_hidden > 128:
+            recs.append("Reduce prefix_hidden to reduce gradient magnitude.")
+    elif grad_state == "yellow":
+        if batch_size >= 16 or epoch > 32:
+            recs.append("Consider slightly decreasing batch size or epoch count to improve gradient stability.")
+        elif prefix_hidden > 128:
+            recs.append("Consider slightly reducing prefix_hidden for gradient stability.")
 
-    # Gradient / Norm Rules
-    if grad_ratio > get_threshold("grad_ratio_q75", 1.15):
-        recs.append("Reduce prefix_hidden or layer_tuned (scope) to control gradient imbalance")
-    if grad_norm > get_threshold("gradient_norm_mean_mean_q75", 0.22):
-        recs.append("Lower learning_rate or prefix_hidden to reduce gradient magnitude")
+    if prefix_length != "all" and grad_state == "red":
+        recs.append("Use full prefix ('all') to stabilize training and reduce gradient spikes.")
+    if layers_tuned > 1 and grad_state == "red":
+        recs.append("Reduce number of layers tuned to improve stability.")
 
-    # Epoch / Convergence Rules
-    if eval_loss > get_threshold("eval_loss_mean_q75", 2.7):
-        recs.append("Increase number of epochs for better convergence")
-    if efficiency > get_threshold("training_efficiency_mean_q75", 35000):
-        recs.append("Reduce epochs or increase batch_size to shorten training time")
-
-    # Prefix Tuning Specific Adjustments
-    if overfit > get_threshold("overfit_flag_mean_q75", 0.15) and prefix_len != "all":
-        recs.append("Use full prefix ('all') to stabilize training and reduce overfitting")
-    if layer_scope and layer_scope > 128 and grad_norm > get_threshold("gradient_norm_mean_mean_q75", 0.22):
-        recs.append("Reduce layer_tuned (scope) to improve stability")
-    if prefix_hidden < 128 and overfit > get_threshold("overfit_flag_mean_q75", 0.1):
-        recs.append("Increase prefix_hidden to reduce overfitting")
-
-    # Output Quality Rules
-    if quality < get_threshold("quality_score_mean_q25", 0.24):
-        recs.append("Increase prefix_hidden or adjust prefix_length to improve output quality")
-    if gen_gap > get_threshold("loss_best_worst_gap_q75", 0.35):
-        recs.append("Simplify prefix scope (reduce layer_tuned (scope)) to reduce generalization gap")
-
-    # Learning rate / batch size rules
-    if loss_stab > get_threshold("loss_stability_q75", 0.1) and gen_gap > get_threshold("loss_best_worst_gap_q75",
-                                                                                        0.35):
-        recs.append("Reduce learning_rate to prevent unstable training")
-    if efficiency < get_threshold("training_efficiency_mean_q25", 5000) and grad_norm < get_threshold(
-            "gradient_norm_mean_mean_q25", 0.15):
-        recs.append("Increase learning_rate for faster convergence")
-    if batch_size < 4 and efficiency < get_threshold("training_efficiency_mean_q50", 10000):
-        recs.append("Increase batch_size to improve stability")
+    quality_gap = meta.get("quality_score_gap", 0.0)
+    if not is_training_healthy and quality_gap > thresholds.get("quality_score_gap_q75", 0.02) and num_modules > 2:
+        recs.append("Reduce target modules to improve training stability.")
+    if is_training_healthy and quality_gap < thresholds.get("quality_score_gap_q25", 0.011) and num_modules < 2:
+        recs.append("Consider expanding target modules to improve model capacity.")
 
     if not recs:
-        recs.append("Configuration appears stable and efficient; no immediate changes needed")
+        recs.append("Configuration appears stable and efficient; no immediate changes needed.")
 
     return recs

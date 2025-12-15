@@ -14,7 +14,7 @@ X_scaler_main = joblib.load("prefix_input_scaler.pkl")
 y_scaler_main = joblib.load("prefix_target_scaler.pkl")
 
 input_dim = len(X_scaler_main.feature_names_in_)
-output_dim = 3  # overfit_mean, training_efficiency_mean, loss_difain_eval
+output_dim = 3
 
 model = RecommendationModel(input_dim=input_dim, output_dim=output_dim)
 model.load_state_dict(torch.load("prefix_recommendation_model.pt"))
@@ -33,8 +33,18 @@ helper_y_cols = helper_scalers["y_cols"]
 helper_X_cols = helper_scalers["X_cols"]
 
 
+app = FastAPI(title="Prefix Tuning Hyperparameter Recommendation API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 def preprocess_helper_input(config: Dict):
-    # Convert input to DataFrame
     df = pd.DataFrame([config])
 
     for col in helper_X_cols:
@@ -48,19 +58,7 @@ def preprocess_helper_input(config: Dict):
             else:
                 df[col] = 0
 
-    df = df[helper_X_cols].astype(float)
-    return df
-
-
-app = FastAPI(title="Prefix Tuning Hyperparameter Recommendation API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    return df[helper_X_cols].astype(float)
 
 
 @app.post("/predict/")
@@ -73,15 +71,19 @@ def predict_prefix(config: Dict):
     y_pred_helper = y_scaler_helper.inverse_transform(y_pred_scaled_helper)
 
     predicted_raw = {
-        col: float(val) for col, val in zip(helper_y_cols, y_pred_helper[0])
+        col: float(val)
+        for col, val in zip(helper_y_cols, y_pred_helper[0])
     }
 
-    full_meta = compute_derived_metrics(predicted_raw)
+    derived_meta = compute_derived_metrics(predicted_raw)
 
-    full_input = {**config, **full_meta}
+    full_input = {**config, **derived_meta}
     df_main = pd.DataFrame([full_input])
 
-    X_main_scaled = X_scaler_main.transform(df_main[X_scaler_main.feature_names_in_])
+    X_main_scaled = X_scaler_main.transform(
+        df_main[X_scaler_main.feature_names_in_]
+    )
+
     X_tensor = torch.tensor(X_main_scaled, dtype=torch.float32).to(device)
 
     with torch.no_grad():
@@ -89,12 +91,23 @@ def predict_prefix(config: Dict):
 
     preds = y_scaler_main.inverse_transform([preds_scaled])[0]
 
-    recommendations = generate_prefix_recommendations(full_meta, preds)
+    training_speed, loss_slope, gradient_norm = preds
+
+    full_meta = {**config, **derived_meta}
+
+    recommendations = generate_prefix_recommendations(
+        full_meta,
+        {
+            "training_speed": training_speed,
+            "loss_slope": loss_slope,
+            "gradient_norm": gradient_norm,
+        }
+    )
 
     return {
-        "predicted_overfit": float(preds[0]),
-        "predicted_efficiency": float(preds[1]) / 100000,
-        "predicted_generalization_gap": float(preds[2]),
-        "predicted_metrics": full_meta,
-        "final_recommendations": recommendations
+        "training_speed": float(training_speed),
+        "loss_slope": float(loss_slope),
+        "gradient_norm": float(gradient_norm),
+        "derived_metrics": full_meta,
+        "final_recommendations": recommendations,
     }
