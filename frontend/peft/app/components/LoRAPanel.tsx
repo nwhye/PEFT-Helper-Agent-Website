@@ -284,7 +284,7 @@ const handleSubmit = async () => {
                         </BarChart>
                       </ResponsiveContainer>
                       <p className="text-gray-400 mt-5 text-sm">
-                        Higher is better. Faster, more efficient training. Excellent {'>'} 60k, Good 30k–60k, Poor {'<'} 30k.
+                        Higher is better. Faster, more efficient training. {/*Excellent {'>'} 60k, Good 30k–60k, Poor {'<'} 30k.*/}
                       </p>
                     </div>
 
@@ -321,7 +321,7 @@ const handleSubmit = async () => {
                         </BarChart>
                       </ResponsiveContainer>
                       <p className="text-gray-400 mt-5 text-sm">
-                        Closer to 0 is better. Stable convergence. Excellent {'<'} 0.0005, Good 0.0005–0.001, Poor {'>'} 0.001."
+                        Closer to 0 is better. Stable convergence. {/*Excellent {'<'} 0.0005, Good 0.0005–0.001, Poor {'>'} 0.001.*/}
                       </p>
                     </div>
 
@@ -358,7 +358,7 @@ const handleSubmit = async () => {
                         </BarChart>
                       </ResponsiveContainer>
                       <p className="text-gray-400 mt-5 text-sm">
-                        Lower is safer. Avoid gradient explosion. Excellent {'<'} 0.2, Good 0.2–0.3, Poor {'>'} 0.3.
+                        Lower is safer. Avoid gradient explosion. {/*Excellent {'<'} 0.2, Good 0.2–0.3, Poor {'>'} 0.3.*/}
                       </p>
                     </div>
                   </div>

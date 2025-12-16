@@ -139,9 +139,6 @@ export default function PrefixPanel() {
                   if (!isValid) errorMessage = "Must be float 0–1";
                   break;
                 case "learning_rate":
-                  isValid = !isNaN(Number(value));
-                  if (!isValid) errorMessage = "Must be numeric";
-                  break;
               }
             }
 
@@ -206,7 +203,7 @@ export default function PrefixPanel() {
 
         {/* Results Panel */}
         <div className="relative flex-1 bg-gray-900 rounded-2xl p-6 shadow-lg overflow-visible">
-          <h2 className="text-xl font-semibold mb-4 text-gray-100">Results & Charts</h2>
+          <h2 className="text-xl font-semibold mb-4 text-gray-100">Results & Chart</h2>
 
           {loading && (
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-50">
@@ -232,7 +229,7 @@ export default function PrefixPanel() {
                     <BarChart data={trainingSpeedData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="name" stroke="#D1D5DB" />
-                      <YAxis stroke="#D1D5DB" domain={[Math.min(...trainingSpeedData.map(d => d.value), 0), Math.max(...trainingSpeedData.map(d => d.value), 70000)]} />
+                      <YAxis stroke="#D1D5DB" domain={[Math.min(...trainingSpeedData.map(d => d.value), 0), Math.max(...trainingSpeedData.map(d => d.value), 80000)]} />
                       <Tooltip
                           contentStyle={{
                               backgroundColor: "#1F2937",
@@ -251,7 +248,7 @@ export default function PrefixPanel() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <p className="text-gray-400 mt-2 text-sm">Higher is better. Excellent &gt;25k, Good 8k–25k, Poor &lt;8k.</p>
+                  <p className="text-gray-400 mt-2 text-sm">Higher is better. Faster, more efficient training.{/* Excellent &gt;25k, Good 8k–25k, Poor &lt;8k.*/}</p>
                 </div>
 
                 {/* Loss Slope */}
@@ -260,7 +257,7 @@ export default function PrefixPanel() {
                     <BarChart data={lossSlopeData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="name" stroke="#D1D5DB" />
-                      <YAxis stroke="#D1D5DB" domain={[Math.min(...lossSlopeData.map(d => d.value), -0.0025), Math.max(...lossSlopeData.map(d => d.value), 0.0025)]} />
+                      <YAxis stroke="#D1D5DB" domain={[Math.min(...lossSlopeData.map(d => d.value), -0.0025), Math.max(...lossSlopeData.map(d => d.value), 0.025)]} />
                       <Tooltip
                           contentStyle={{
                               backgroundColor: "#1F2937",
@@ -279,7 +276,7 @@ export default function PrefixPanel() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <p className="text-gray-400 mt-2 text-sm">Closer to 0 is better. Excellent &lt;0.0005, Good 0.0005–0.0015, Poor &gt;0.001.</p>
+                  <p className="text-gray-400 mt-2 text-sm">Closer to 0 is better. Stable convergence.{/*Excellent &lt;0.0005, Good 0.0005–0.0015, Poor &gt;0.001.*/}</p>
                 </div>
 
                 {/* Gradient Norm */}
@@ -288,7 +285,7 @@ export default function PrefixPanel() {
                     <BarChart data={gradientNormData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="name" stroke="#D1D5DB" />
-                      <YAxis stroke="#D1D5DB" domain={[Math.min(...gradientNormData.map(d => d.value), 0), Math.max(...gradientNormData.map(d => d.value), 0.35)]} />
+                      <YAxis stroke="#D1D5DB" domain={[Math.min(...gradientNormData.map(d => d.value), 0), Math.max(...gradientNormData.map(d => d.value), 0.50)]} />
                       <Tooltip
                           contentStyle={{
                               backgroundColor: "#1F2937",
@@ -307,7 +304,7 @@ export default function PrefixPanel() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <p className="text-gray-400 mt-2 text-sm">Lower is safer. Excellent &lt;0.35, Good 0.35–0.43, Poor &gt;0.43.</p>
+                  <p className="text-gray-400 mt-2 text-sm">Lower is safer. Avoid gradient explosion.{/*Excellent &lt;0.35, Good 0.35–0.43, Poor &gt;0.43.*/}</p>
                 </div>
               </div>
             </div>
