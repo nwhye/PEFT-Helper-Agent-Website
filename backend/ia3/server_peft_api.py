@@ -111,7 +111,7 @@ def predict_ia3(config: Dict):
     }
 
     full_meta = {**config, **derived_meta}
-    recommendations = generate_ia3_recommendations(full_meta)
+    recommendations = generate_ia3_recommendations(full_meta, predicted_metrics)
 
     return {
         "predicted_metrics": predicted_metrics,

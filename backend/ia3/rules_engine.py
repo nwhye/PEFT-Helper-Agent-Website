@@ -1,94 +1,134 @@
 import json
+import math
 
 
-def _state_from_thresholds(value, q25, q50, q75):
-    if value <= q25:
+def training_efficiency_state(v):
+    if v > 20000:
         return "green"
-    if value <= q50:
+    if v > 10000:
         return "yellow"
     return "red"
 
 
-def generate_ia3_recommendations(meta: dict, thresholds_path="utils/ia3_recommendation_thresholds.json"):
+def loss_slope_state(v):
+    if v < 0.0005:
+        return "green"
+    if v < 0.001:
+        return "yellow"
+    return "red"
+
+
+def gradient_norm_state(v):
+    if v < 3.4:
+        return "green"
+    if v < 4.3:
+        return "yellow"
+    return "red"
+
+
+def generate_ia3_recommendations(
+    meta,
+    predicted_values,
+    thresholds_path="utils/ia3_recommendation_thresholds.json",
+):
+    """
+    Generate IA3 hyperparameter suggestions based on predicted metrics:
+    - training_efficiency
+    - loss_slope
+    - gradient_norm
+
+    Fully aligned with frontend GREEN / YELLOW / RED logic.
+    """
+
     with open(thresholds_path, "r") as f:
-        T = json.load(f)
+        thresholds = json.load(f)
 
-    recs = []
-
-    loss_stab = meta.get("loss_stability", 0.0)
-    loss_slope_stab = meta.get("loss_slope_stability", 0.0)
-    grad_stab = meta.get("grad_stability", 0.0)
-    efficiency = meta.get("training_efficiency_mean", 0.0)
-    efficiency_gap = meta.get("efficiency_gap", 0.0)
-    overfit = meta.get("overfit_flag_mean", 0.0)
-    robustness = meta.get("robustness_score", 0.0)
-    eval_loss = meta.get("eval_loss_mean", 0.0)
-    quality = meta.get("quality_score_mean", 0.0)
-    quality_gap = meta.get("quality_score_gap", 0.0)
-    loss_gap = meta.get("loss_best_worst_gap", 0.0)
+    training_efficiency = predicted_values.get("training_speed", 0.0)
+    loss_slope = predicted_values.get("loss_slope", 0.0)
+    gradient_norm = predicted_values.get("gradient_norm", 0.0)
 
     batch_size = int(meta.get("batch_size", 4))
     epoch = int(meta.get("epoch", 1))
     layers_tuned = int(meta.get("layers_tuned", 0))
+    target_modules = meta.get("target_modules", ["q", "k", "v"])
+    learning_rate = float(meta.get("learning_rate", 1e-6))
 
-    tm_cols = [c for c in meta.keys() if c.startswith("tm_")]
-    active_modules = sum([meta.get(c, 0) for c in tm_cols])
+    num_modules = len(target_modules)
 
-    loss_state = _state_from_thresholds(loss_stab, T["loss_stability_q25"], T["loss_stability_q50"],
-                                        T["loss_stability_q75"])
-    slope_state = _state_from_thresholds(loss_slope_stab, T["loss_slope_stability_q25"], T["loss_slope_stability_q50"],
-                                         T["loss_slope_stability_q75"])
-    grad_state = _state_from_thresholds(grad_stab, T["grad_stability_q25"], T["grad_stability_q50"],
-                                        T["grad_stability_q75"])
-    efficiency_state = _state_from_thresholds(efficiency, T["training_efficiency_mean_q25"],
-                                              T["training_efficiency_mean_q50"], T["training_efficiency_mean_q75"])
+    recs = []
 
-    is_training_healthy = loss_state == "green" and slope_state == "green" and grad_state == "green"
+    efficiency_state = training_efficiency_state(training_efficiency)
+    slope_state = loss_slope_state(loss_slope)
+    grad_state = gradient_norm_state(gradient_norm)
 
-    if loss_state == "red":
-        recs.append("Reduce learning rate — IA3 loss is unstable.")
+    is_training_healthy = (
+        efficiency_state == "green"
+        and slope_state == "green"
+        and grad_state == "green"
+    )
+
+
+    if efficiency_state == "red":
+        if batch_size >= 16:
+            recs.append("Consider decreasing batch size to improve IA3 training efficiency.")
+        elif batch_size < 16 or learning_rate < 1e-6:
+            recs.append("Increase batch size or slightly increase learning rate to improve IA3 efficiency.")
+
     if slope_state == "red":
-        recs.append("Increase batch size or reduce learning rate to stabilize IA3 training dynamics.")
+        if batch_size >= 8 or target_modules == ["q", "k", "v", "o"]:
+            recs.append("Consider decreasing batch size or set of target modules to improve IA3 stability.")
+        elif epoch < 3:
+            recs.append("Increase epochs or reduce learning rate for more stable IA3 training.")
+
     if grad_state == "red":
-        recs.append("Reduce number of IA3 layers or restrict target modules to attention-only.")
+        if batch_size >= 8 or epoch > 64:
+            recs.append("Consider decreasing batch size or epoch count to reduce IA3 gradient spikes.")
+        elif layers_tuned > 1:
+            recs.append("Reduce number of IA3 layers to stabilize gradients.")
 
-    if overfit > T["overfit_flag_mean_q75"]:
-        recs.append("Reduce IA3 layers tuned to mitigate overfitting.")
 
-    if loss_gap > T["loss_best_worst_gap_q75"]:
-        recs.append("Reduce learning rate or IA3 layer scope to improve generalization.")
+    if efficiency_state == "yellow":
+        if batch_size >= 8:
+            recs.append("Consider decreasing batch size slightly to improve IA3 efficiency.")
+        elif batch_size < 8:
+            recs.append("Consider very slightly increasing batch size to improve IA3 efficiency.")
 
-    if efficiency < T["training_efficiency_mean_q25"]:
-        recs.append("Increase learning rate or batch size — IA3 should train efficiently.")
+    if slope_state == "yellow":
+        if batch_size >= 16:
+            recs.append("Consider decreasing batch size to improve IA3 stability.")
+        elif epoch < 12:
+            recs.append("Slightly increase epochs to improve IA3 loss stability.")
 
-    if efficiency_gap > T["efficiency_gap_q75"]:
-        recs.append("Reduce IA3 layers or epochs — efficiency varies too much across runs.")
+    if grad_state == "yellow":
+        if batch_size >= 16 or epoch > 32:
+            recs.append("Consider slightly decreasing batch size or epoch count to improve gradients.")
+        elif layers_tuned > 2:
+            recs.append("Consider reducing IA3 layers for extra gradient stability.")
+        else:
+            recs.append("Consider slightly increasing batch size or reduce target modules to improve gradient stability.")
 
-    if efficiency > T["training_efficiency_mean_q75"] and eval_loss > T["eval_loss_mean_q50"]:
-        recs.append("Reduce IA3 layers — training is fast but not converging well.")
 
-    if quality < T["quality_score_mean_q75"]:
-        recs.append("Expand IA3 to additional attention modules (q/k/v) to improve model capacity.")
+    if efficiency_state == "green":
+        if epoch > 1:
+            recs.append("(Optional) Reduce epochs if you want to improve training efficiency further.")
 
-    if quality_gap > T["quality_score_gap_q75"] and active_modules > 2:
-        recs.append("Restrict IA3 target modules to reduce output inconsistency.")
+    if grad_state == "red" or slope_state == "red":
+        if layers_tuned > 1:
+            recs.append("Reduce IA3 layers to stabilize training gradients or loss.")
 
-    if eval_loss > T["eval_loss_mean_q50"] and epoch < 3:
-        recs.append("Increase epochs — IA3 often requires more steps to converge.")
+    if is_training_healthy:
+        if layers_tuned < 8:
+            recs.append("(Optional) Consider increasing IA3 layers to improve model capacity.")
 
-    if efficiency_state == "red" and batch_size < 8:
-        recs.append("Increase batch size for more stable IA3 optimization.")
+    if grad_state == "red" and slope_state == "red":
+        recs.append(
+            "Both gradient spikes and unstable loss detected; consider increasing batch size and reducing epochs."
+        )
 
-    if efficiency_state == "green" and epoch > 1:
-        recs.append("(Optional) Reduce epochs to save compute — IA3 is already converging well.")
-
-    if robustness < T["robustness_score_q75"]:
-        recs.append("Overall robustness is low — reduce IA3 layer count and simplify target modules.")
-
-    if robustness > T["robustness_score_q90"] and quality < T["quality_score_mean_q75"]:
-        recs.append("(Optional) Increase IA3 layers or target modules to improve expressiveness.")
 
     if not recs:
-        recs.append("Configuration appears stable, efficient, and robust — no IA3 adjustments needed.")
+        recs.append(
+            "Configuration appears stable and efficient; no immediate IA3 changes needed."
+        )
 
     return recs
