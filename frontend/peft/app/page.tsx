@@ -5,6 +5,8 @@ import * as Tabs from "@radix-ui/react-tabs";
 
 import LoRAPanel from "./components/LoRAPanel";
 import PrefixPanel from "./components/PrefixPanel";
+import IA3Panel from "./components/ia3Panel";
+
 
 export default function HomePage() {
   const [selectedTab, setSelectedTab] = useState("lora");
@@ -15,7 +17,7 @@ export default function HomePage() {
 
         <Tabs.Root value={selectedTab} onValueChange={setSelectedTab}>
 
-          {/* ---------------- Tabs Header ---------------- */}
+          {}
           <Tabs.List className="flex border-b border-gray-700 mb-6">
 
             {/* LoRA Tab */}
@@ -34,7 +36,7 @@ export default function HomePage() {
             {/* Prefix Tab */}
             <Tabs.Trigger
               value="prefix"
-              className={`px-6 py-2 rounded-t-lg border border-b-0 
+              className={`px-6 py-2 rounded-t-lg border border-b-0 mr-2
                 ${
                   selectedTab === "prefix"
                     ? "bg-gray-900 border-gray-700 text-gray-200"
@@ -43,15 +45,33 @@ export default function HomePage() {
             >
               Prefix Tuning
             </Tabs.Trigger>
+
+
+              {/* ia3 tab */}
+            <Tabs.Trigger
+              value="ia3"
+              className={`px-6 py-2 rounded-t-lg border border-b-0 mr-2
+                ${
+                  selectedTab === "ia3"
+                    ? "bg-gray-900 border-gray-700 text-gray-200"
+                    : "bg-gray-800 border-gray-800 text-gray-400 hover:bg-gray-700"
+                }`}
+            >
+              IA3
+            </Tabs.Trigger>
           </Tabs.List>
 
-          {/* ---------------- Tab Content ---------------- */}
+          {}
           <Tabs.Content value="lora">
             <LoRAPanel />
           </Tabs.Content>
 
           <Tabs.Content value="prefix">
             <PrefixPanel />
+          </Tabs.Content>
+
+            <Tabs.Content value="ia3">
+            <IA3Panel />
           </Tabs.Content>
 
         </Tabs.Root>
