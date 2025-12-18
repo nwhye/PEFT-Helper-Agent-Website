@@ -257,7 +257,7 @@ export default function PrefixPanel() {
                     <BarChart data={lossSlopeData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="name" stroke="#D1D5DB" />
-                      <YAxis stroke="#D1D5DB" domain={[Math.min(...lossSlopeData.map(d => d.value), -0.0025), Math.max(...lossSlopeData.map(d => d.value), 0.025)]} />
+                      <YAxis stroke="#D1D5DB" domain={[Math.min(...lossSlopeData.map(d => d.value), -0.0030), Math.max(...lossSlopeData.map(d => d.value), 0.025)]} />
                       <Tooltip
                           contentStyle={{
                               backgroundColor: "#1F2937",
